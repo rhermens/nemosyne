@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from nemosyne.settings import Settings
+from nemosyne.config.settings import Settings
 
 
 class FailureReason(StrEnum):

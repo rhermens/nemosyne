@@ -1,19 +1,25 @@
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Self
 
 import yaml
 from fastapi import Depends
 from pydantic import BaseModel
 
+from nemosyne.model.llm import Provider
+
 
 @dataclass(frozen=True, slots=True)
 class Settings(BaseModel):
     model: str
-    provider: str
+    provider: Provider
     skills_directory: Path
     data_directory: Path
+
+    @property
+    def auth_path(self) -> Path:
+        return self.data_directory.expanduser().joinpath("auth.json")
 
     @property
     def sessions_path(self) -> Path:
@@ -22,6 +28,15 @@ class Settings(BaseModel):
     def ensure_directories(self) -> None:
         return self.sessions_path.mkdir(parents=True, exist_ok=True)
 
+    @classmethod
+    def load(cls, *paths: Path) -> Self:
+        for path in paths:
+            if not path.exists():
+                continue
+            with path.open(encoding="utf-8") as file:
+                return cls.model_validate(yaml.safe_load(file))
+        raise NoSettings()
+
 
 class NoSettings(BaseException):
     pass
@@ -29,17 +44,7 @@ class NoSettings(BaseException):
 
 @cache
 def get_settings() -> Settings:
-    local_json = Path("./settings.yaml")
-    if local_json.exists():
-        with local_json.open(encoding="utf-8") as file:
-            return Settings.model_validate(yaml.safe_load(file))
-
-    json = Path("~/.nemosyne/settings.yaml").expanduser()
-    if not json.exists():
-        raise NoSettings()
-
-    with json.open(encoding="utf-8") as file:
-        return Settings.model_validate(yaml.safe_load(file))
+    return Settings.load(Path("./settings.yaml"), Path("~/.nemosyne/settings.yaml"))
 
 
 SettingsDependency = Annotated[Settings, Depends(get_settings)]

@@ -5,9 +5,11 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "blinker>=1.9.0",
     "fastapi>=0.141.1",
     "pydantic>=2.13.4",
     "pyyaml>=6.0.3",
+    "questionary>=2.1.1",
     "uvicorn[standard]>=0.52.1",
 ]
 
@@ -31,7 +33,7 @@ dev = [
 ]
 
 [tool.poe.tasks]
-test = "pytest"
+test = "pytest -s"
 typecheck = "basedpyright ."
 check = [
    { cmd = "ruff check ." },

@@ -1,31 +1,22 @@
-from datetime import UTC, datetime
-from pathlib import Path
+from typing import cast
 
-from nemosyne.model import Event, Inconclusive, Session, Succeeded
-from nemosyne.settings import get_settings
+import questionary
+
+from nemosyne.config.auth import ApiKey, AuthStorage
+from nemosyne.config.settings import get_settings
 
 
 def main() -> None:
     settings = get_settings()
     settings.ensure_directories()
 
-    session = Session(
-        id="test-session",
-        model=settings.model,
-        working_directory=Path.cwd(),
-        sequence=[
-            Event(
-                timestamp=datetime.now(UTC),
-                kind="authentication",
-                tool="auth",
-                event_outcome=Succeeded(),
-                semantic_outcome=Inconclusive(),
-                summary="Authentication session initialized",
-            )
-        ],
-    )
+    auth = AuthStorage.load(settings.auth_path)
+    api_key = cast(str, questionary.password("Enter API key: ").ask())
+    if api_key == "":
+        return
 
-    print(session.write(settings))
+    auth.root[settings.provider] = ApiKey(api_key)
+    _ = auth.store(settings.auth_path)
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict
 
-from nemosyne.model import Event, EventOutcome, Session, SkillUsage
+from nemosyne.model.sequence import Event, EventOutcome, Session, SkillUsage
 
 
 class OmitExtra(BaseModel):

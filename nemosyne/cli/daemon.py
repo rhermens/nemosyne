@@ -3,7 +3,7 @@ from fastapi import FastAPI
 
 from nemosyne.api.session import CreateSession
 from nemosyne.config.settings import SettingsDependency
-from nemosyne.model.sequence import Session
+from nemosyne.data.sequence import Session
 from nemosyne.signals.sequence import SequenceCreated
 
 app = FastAPI(title="Nemosyne daemon")

@@ -4,7 +4,7 @@ from typing import Self
 
 from pydantic import RootModel
 
-from nemosyne.model.llm import Provider
+from nemosyne.config.llm import Provider
 
 
 @dataclass(frozen=True)

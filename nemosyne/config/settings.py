@@ -7,7 +7,7 @@ import yaml
 from fastapi import Depends
 from pydantic import BaseModel
 
-from nemosyne.model.llm import Provider
+from nemosyne.config.llm import Provider
 
 
 @dataclass(frozen=True, slots=True)

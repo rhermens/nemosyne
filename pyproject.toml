@@ -5,13 +5,11 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "blinker>=1.9.0",
-    "fastapi>=0.141.1",
+    "mcp>=1.29.0,<2",
     "pydantic>=2.13.4",
     "pydantic-ai>=2.29.0",
     "pyyaml>=6.0.3",
     "questionary>=2.1.1",
-    "uvicorn[standard]>=0.52.1",
 ]
 
 [project.scripts]

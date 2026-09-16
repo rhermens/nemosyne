@@ -1,8 +1,8 @@
 from datetime import datetime
 from pathlib import Path
-from typing import ClassVar
+from typing import Annotated, ClassVar
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from nemosyne.data.sequence import Event, EventOutcome, Session, SkillUsage
 
@@ -45,8 +45,11 @@ class CreateSkillUsage(OmitExtra):
 CreateSequenceEvent = CreateEvent | CreateSkillUsage
 
 
+SessionId = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")]
+
+
 class CreateSession(OmitExtra):
-    id: str
+    id: SessionId
     model: str
     working_directory: Path
     sequence: list[CreateSequenceEvent]

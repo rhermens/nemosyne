@@ -6,8 +6,6 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from nemosyne.config.settings import Settings
-
 
 class FailureReason(StrEnum):
     INVALID_REQUEST = "InvalidRequest"
@@ -85,7 +83,3 @@ class Session(BaseModel):
     model: str
     working_directory: Path
     sequence: list[SequenceEvent]
-
-    def write(self, settings: Settings) -> int:
-        file_path = settings.sessions_path.joinpath(f"{self.id}.json")
-        return file_path.write_text(self.model_dump_json(), "utf-8")

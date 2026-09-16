@@ -1,10 +1,9 @@
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
-from typing import Annotated, Self
+from typing import Self
 
 import yaml
-from fastapi import Depends
 from pydantic import BaseModel
 
 from nemosyne.config.llm import Provider
@@ -45,6 +44,3 @@ class NoSettings(BaseException):
 @cache
 def get_settings() -> Settings:
     return Settings.load(Path("./settings.yaml"), Path("~/.nemosyne/settings.yaml"))
-
-
-SettingsDependency = Annotated[Settings, Depends(get_settings)]

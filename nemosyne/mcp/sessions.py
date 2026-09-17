@@ -1,10 +1,10 @@
 from pathlib import Path
 
+from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel
 
 from nemosyne.api.session import CreateSequenceEvent, CreateSession, SessionId
 from nemosyne.config.settings import Settings, get_settings
-from nemosyne.mcp import mcp
 
 
 class StoreSessionResult(BaseModel):
@@ -45,7 +45,6 @@ def save_session(data: CreateSession, settings: Settings) -> StoreSessionResult:
     )
 
 
-@mcp.tool(structured_output=True)
 def store_session(
     id: SessionId,
     model: str,
@@ -62,3 +61,7 @@ def store_session(
         ),
         get_settings(),
     )
+
+
+def register_session_tools(mcp: FastMCP):
+    mcp.add_tool(store_session, structured_output=True)

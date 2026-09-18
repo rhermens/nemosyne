@@ -67,6 +67,14 @@ class Event:
 
 
 @dataclass(frozen=True, slots=True)
+class Message:
+    timestamp: datetime
+    kind: Literal["message"]
+    role: Literal["user", "assistant"]
+    content: str
+
+
+@dataclass(frozen=True, slots=True)
 class SkillUsage:
     skill: str
     path: Path
@@ -74,7 +82,7 @@ class SkillUsage:
     trigger_reason: str | None
 
 
-SequenceEvent = Event | SkillUsage
+SequenceEvent = Event | Message | SkillUsage
 
 
 @dataclass(frozen=True, slots=True)

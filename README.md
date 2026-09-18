@@ -16,7 +16,7 @@ It records agent sessions, analyzes them for recurring patterns, and uses those 
 
 ## Intended workflow
 
-1. A session-ending hook calls Nemosyne's `store_session` MCP tool.
+1. An agent-settled hook sends the latest session snapshot to Nemosyne's HTTP API.
 2. Nemosyne stores the session for later analysis.
 3. The curator compares evidence across sessions.
 4. It separates durable lessons from project-specific details.
@@ -43,15 +43,15 @@ Sessions may contain source code, credentials, personal information, or confiden
 
 ### Harness independence
 
-Session ingestion and skill updates use MCP contracts so Nemosyne can integrate with different agent harnesses.
+Session ingestion uses an HTTP contract so Nemosyne can integrate with different agent harnesses.
 
 ## Current status
 
 Nemosyne is an early prototype. It currently provides:
 
-- A Streamable HTTP MCP server.
-- A `store_session` MCP tool for completed sessions.
-- Idempotent JSON session storage.
+- A FastAPI HTTP server.
+- A `POST /sessions` endpoint for completed sessions.
+- Idempotent updates of settled session snapshots.
 - Models for event outcomes, semantic outcomes, and skill usage.
 - OpenRouter-backed LLM configuration.
 - Initial support for enriching sessions with summaries and semantic outcomes.
@@ -68,11 +68,20 @@ uv run poe test
 uv run poe check
 ```
 
-Run the MCP server:
+Run the HTTP server:
 
 ```bash
 uv run daemon
 ```
 
-The server exposes Streamable HTTP MCP at `http://127.0.0.1:8000/mcp`.
-A session-ending hook should invoke `store_session` directly rather than asking the model to call it.
+The server accepts session snapshots at `http://127.0.0.1:9787/sessions`.
+The same session ID is updated when a later settled snapshot arrives.
+
+Load the included Pi extension:
+
+```bash
+pi -e ./extensions/pi
+```
+
+The extension POSTs the active branch after each `agent_settled` event. See
+[`extensions/pi/README.md`](extensions/pi/README.md) for configuration.

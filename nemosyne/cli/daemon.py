@@ -7,14 +7,14 @@ from fastapi import Depends, FastAPI
 
 from nemosyne.api.session import CreateSession, StoreSessionResult, save_session
 from nemosyne.config.settings import SchedulerSettings, Settings, get_settings
-from nemosyne.scheduler import create_scheduler
+from nemosyne.schedule.scheduler import create_scheduler
 
 
 class RunningScheduler(Protocol):
     def start(self) -> None:
         """Start scheduled job processing."""
 
-    async def shutdown(self) -> None:
+    def shutdown(self, wait: bool = True) -> None:
         """Stop scheduled job processing."""
 
 
@@ -35,7 +35,7 @@ def create_app(
             yield
         finally:
             if scheduler is not None:
-                await scheduler.shutdown()
+                scheduler.shutdown(wait=False)
 
     application = FastAPI(title="Nemosyne daemon", lifespan=lifespan)
 

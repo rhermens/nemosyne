@@ -1,15 +1,25 @@
 import asyncio
 import logging
 from pathlib import Path
+from typing import Protocol, cast
 
 import pytest
+from apscheduler.schedulers.asyncio import (  # pyright: ignore[reportMissingTypeStubs]
+    AsyncIOScheduler,
+)
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from nemosyne.cli.daemon import create_app
 from nemosyne.config.llm import Provider
 from nemosyne.config.settings import SchedulerSettings, Settings
-from nemosyne.scheduler import DaemonScheduler, create_scheduler, scheduled_maintenance
+from nemosyne.scheduler import create_scheduler, scheduled_maintenance
+
+
+class ConfiguredJob(Protocol):
+    trigger: object
+    coalesce: bool
+    max_instances: int
 
 
 def test_scheduler_is_disabled_by_default() -> None:
@@ -21,11 +31,14 @@ def test_scheduler_registers_maintenance_cron_job() -> None:
         SchedulerSettings(enabled=True, cron="15 3 * * *", timezone="Europe/Amsterdam")
     )
 
-    assert isinstance(scheduler, DaemonScheduler)
-    job = scheduler.get_job_info("scheduled-maintenance")
+    assert isinstance(scheduler, AsyncIOScheduler)
+    job = cast(
+        ConfiguredJob | None,
+        scheduler.get_job("scheduled-maintenance"),  # pyright: ignore[reportUnknownMemberType]
+    )
     assert job is not None
-    assert job.trigger == "cron[month='*', day='*', day_of_week='*', hour='3', minute='15']"
-    assert job.timezone == "Europe/Amsterdam"
+    assert str(job.trigger) == "cron[month='*', day='*', day_of_week='*', hour='3', minute='15']"
+    assert str(scheduler.timezone) == "Europe/Amsterdam"
     assert job.coalesce is True
     assert job.max_instances == 1
 
@@ -42,12 +55,13 @@ def test_scheduler_rejects_unknown_timezone() -> None:
 
 def test_scheduler_starts_and_stops_apscheduler() -> None:
     scheduler = create_scheduler(SchedulerSettings(enabled=True))
-    assert isinstance(scheduler, DaemonScheduler)
+    assert isinstance(scheduler, AsyncIOScheduler)
 
     async def run_lifecycle() -> None:
         scheduler.start()
         assert scheduler.running
-        await scheduler.shutdown()
+        scheduler.shutdown(wait=False)
+        await asyncio.sleep(0)
         assert not scheduler.running
 
     asyncio.run(run_lifecycle())
@@ -70,7 +84,8 @@ def test_daemon_starts_and_stops_enabled_scheduler(tmp_path: Path) -> None:
         def start(self) -> None:
             self.started = True
 
-        async def shutdown(self) -> None:
+        def shutdown(self, wait: bool = True) -> None:
+            assert wait is False
             self.stopped = True
 
     scheduler = FakeScheduler()

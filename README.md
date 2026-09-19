@@ -55,6 +55,7 @@ Nemosyne is an early prototype. It currently provides:
 - Models for event outcomes, semantic outcomes, and skill usage.
 - OpenRouter-backed LLM configuration.
 - Initial support for enriching sessions with summaries and semantic outcomes.
+- An optional in-daemon cron scheduler for future maintenance jobs.
 
 Cross-session pattern detection and automated skill curation are not implemented yet.
 
@@ -76,6 +77,18 @@ uv run daemon
 
 The server accepts session snapshots at `http://127.0.0.1:9787/sessions`.
 The same session ID is updated when a later settled snapshot arrives.
+
+Enable the maintenance scheduler in `settings.yaml`:
+
+```yaml
+scheduler:
+  enabled: true
+  cron: "0 3 * * *"
+  timezone: UTC
+```
+
+The cron expression uses five fields: minute, hour, day, month, and weekday.
+The initial maintenance job only writes an informational log entry.
 
 Load the included Pi extension:
 

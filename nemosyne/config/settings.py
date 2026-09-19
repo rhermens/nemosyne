@@ -1,20 +1,51 @@
-from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
-from typing import Self
+from typing import ClassVar, Self
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
-from pydantic import BaseModel
+from apscheduler.triggers.cron import (  # pyright: ignore[reportMissingTypeStubs]
+    CronTrigger,
+)
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from nemosyne.config.llm import Provider
 
 
-@dataclass(frozen=True, slots=True)
+class SchedulerSettings(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    enabled: bool = False
+    cron: str = "0 3 * * *"
+    timezone: str = "UTC"
+
+    @field_validator("cron")
+    @classmethod
+    def validate_cron(cls, value: str) -> str:
+        try:
+            _ = CronTrigger.from_crontab(value)  # pyright: ignore[reportUnknownMemberType]
+        except ValueError as error:
+            raise ValueError("invalid cron expression") from error
+        return value
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, value: str) -> str:
+        try:
+            _ = ZoneInfo(value)
+        except ZoneInfoNotFoundError as error:
+            raise ValueError("unknown scheduler timezone") from error
+        return value
+
+
 class Settings(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
     model: str
     provider: Provider
     skills_directory: Path
     data_directory: Path
+    scheduler: SchedulerSettings = Field(default_factory=SchedulerSettings)
 
     @property
     def auth_path(self) -> Path:

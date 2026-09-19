@@ -1,21 +1,61 @@
-from typing import Annotated
+from collections.abc import AsyncGenerator, Callable
+from contextlib import asynccontextmanager
+from typing import Annotated, Protocol
 
 import uvicorn
 from fastapi import Depends, FastAPI
 
 from nemosyne.api.session import CreateSession, StoreSessionResult, save_session
-from nemosyne.config.settings import Settings, get_settings
+from nemosyne.config.settings import SchedulerSettings, Settings, get_settings
+from nemosyne.scheduler import create_scheduler
 
-app = FastAPI(title="Nemosyne daemon")
+
+class RunningScheduler(Protocol):
+    def start(self) -> None:
+        """Start scheduled job processing."""
+
+    async def shutdown(self) -> None:
+        """Stop scheduled job processing."""
 
 
-@app.post("/sessions")
-def store_session(
-    data: CreateSession,
-    settings: Annotated[Settings, Depends(get_settings)],
-) -> StoreSessionResult:
-    """Store the latest settled session snapshot for later skill curation."""
-    return save_session(data, settings)
+SchedulerFactory = Callable[[SchedulerSettings], RunningScheduler | None]
+SettingsLoader = Callable[[], Settings]
+
+
+def create_app(
+    settings_loader: SettingsLoader = get_settings,
+    scheduler_factory: SchedulerFactory = create_scheduler,
+) -> FastAPI:
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
+        scheduler = scheduler_factory(settings_loader().scheduler)
+        if scheduler is not None:
+            scheduler.start()
+        try:
+            yield
+        finally:
+            if scheduler is not None:
+                await scheduler.shutdown()
+
+    application = FastAPI(title="Nemosyne daemon", lifespan=lifespan)
+
+    def store_session(
+        data: CreateSession,
+        settings: Annotated[Settings, Depends(settings_loader)],
+    ) -> StoreSessionResult:
+        """Store the latest settled session snapshot for later skill curation."""
+        return save_session(data, settings)
+
+    application.add_api_route(
+        "/sessions",
+        store_session,
+        methods=["POST"],
+        response_model=StoreSessionResult,
+    )
+    return application
+
+
+app = create_app()
 
 
 def main() -> None:

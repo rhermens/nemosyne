@@ -2,3 +2,7 @@ provider: openrouter
 model: openai/gpt-5.6-luna
 skills_directory: ~/skills/
 data_directory: ~/.nemosyne/
+scheduler:
+  enabled: false
+  cron: "0 3 * * *"
+  timezone: UTC

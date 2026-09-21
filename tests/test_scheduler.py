@@ -1,5 +1,4 @@
 import asyncio
-import logging
 from pathlib import Path
 from typing import Protocol, cast
 
@@ -13,30 +12,54 @@ from pydantic import ValidationError
 from nemosyne.cli.daemon import create_app
 from nemosyne.config.llm import Provider
 from nemosyne.config.settings import SchedulerSettings, Settings
-from nemosyne.scheduler import create_scheduler, scheduled_maintenance
+from nemosyne.schedule.scheduler import create_scheduler
 
 
 class ConfiguredJob(Protocol):
+    id: str
+    args: tuple[object, ...]
     trigger: object
     coalesce: bool
     max_instances: int
 
 
-def test_scheduler_is_disabled_by_default() -> None:
-    assert create_scheduler(SchedulerSettings()) is None
-
-
-def test_scheduler_registers_maintenance_cron_job() -> None:
-    scheduler = create_scheduler(
-        SchedulerSettings(enabled=True, cron="15 3 * * *", timezone="Europe/Amsterdam")
+def make_settings(
+    tmp_path: Path,
+    *,
+    enabled: bool = False,
+    cron: str = "0 3 * * *",
+    timezone: str = "UTC",
+) -> Settings:
+    return Settings(
+        model="openai/gpt-5.6-luna",
+        provider=Provider.OPENROUTER,
+        skills_directory=tmp_path.joinpath("skills"),
+        data_directory=tmp_path,
+        scheduler=SchedulerSettings(enabled=enabled, cron=cron, timezone=timezone),
     )
+
+
+def test_scheduler_is_disabled_by_default(tmp_path: Path) -> None:
+    assert create_scheduler(make_settings(tmp_path)) is None
+
+
+def test_scheduler_registers_session_enrichment_cron_job(tmp_path: Path) -> None:
+    settings = make_settings(
+        tmp_path,
+        enabled=True,
+        cron="15 3 * * *",
+        timezone="Europe/Amsterdam",
+    )
+    scheduler = create_scheduler(settings)
 
     assert isinstance(scheduler, AsyncIOScheduler)
     job = cast(
         ConfiguredJob | None,
-        scheduler.get_job("scheduled-maintenance"),  # pyright: ignore[reportUnknownMemberType]
+        scheduler.get_job("enrich-sessions"),  # pyright: ignore[reportUnknownMemberType]
     )
     assert job is not None
+    assert job.id == "enrich-sessions"
+    assert job.args == (settings,)
     assert str(job.trigger) == "cron[month='*', day='*', day_of_week='*', hour='3', minute='15']"
     assert str(scheduler.timezone) == "Europe/Amsterdam"
     assert job.coalesce is True
@@ -53,8 +76,8 @@ def test_scheduler_rejects_unknown_timezone() -> None:
         _ = SchedulerSettings(enabled=True, timezone="Mars/Olympus")
 
 
-def test_scheduler_starts_and_stops_apscheduler() -> None:
-    scheduler = create_scheduler(SchedulerSettings(enabled=True))
+def test_scheduler_starts_and_stops_apscheduler(tmp_path: Path) -> None:
+    scheduler = create_scheduler(make_settings(tmp_path, enabled=True))
     assert isinstance(scheduler, AsyncIOScheduler)
 
     async def run_lifecycle() -> None:
@@ -97,10 +120,3 @@ def test_daemon_starts_and_stops_enabled_scheduler(tmp_path: Path) -> None:
     with TestClient(app):
         assert scheduler.started
     assert scheduler.stopped
-
-
-def test_scheduled_maintenance_is_observable(caplog: pytest.LogCaptureFixture) -> None:
-    with caplog.at_level(logging.INFO):
-        scheduled_maintenance()
-
-    assert "Scheduled maintenance completed" in caplog.messages

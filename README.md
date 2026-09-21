@@ -55,7 +55,7 @@ Nemosyne is an early prototype. It currently provides:
 - Models for event outcomes, semantic outcomes, and skill usage.
 - OpenRouter-backed LLM configuration.
 - Initial support for enriching sessions with summaries and semantic outcomes.
-- An optional in-daemon cron scheduler for future maintenance jobs.
+- An optional in-daemon cron job that enriches stored sessions with the configured LLM.
 
 Cross-session pattern detection and automated skill curation are not implemented yet.
 
@@ -88,7 +88,9 @@ scheduler:
 ```
 
 The cron expression uses five fields: minute, hour, day, month, and weekday.
-The initial maintenance job only writes an informational log entry.
+Each run enriches incomplete session events with summaries and semantic outcomes.
+Fully enriched sessions are skipped to avoid repeated LLM calls.
+When enabled, stored session content is sent to the configured LLM provider.
 
 Load the included Pi extension:
 

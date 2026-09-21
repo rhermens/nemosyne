@@ -1,4 +1,3 @@
-import logging
 from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import (  # pyright: ignore[reportMissingTypeStubs]
@@ -8,31 +7,26 @@ from apscheduler.triggers.cron import (  # pyright: ignore[reportMissingTypeStub
     CronTrigger,
 )
 
-from nemosyne.config.settings import SchedulerSettings
-
-logger = logging.getLogger(__name__)
-
-
-def scheduled_maintenance() -> None:
-    """Run the observable placeholder for future maintenance work."""
-    logger.info("Scheduled maintenance completed")
+from nemosyne.config.settings import Settings
+from nemosyne.schedule.enrich_sessions import enrich_stored_sessions
 
 
-def create_scheduler(settings: SchedulerSettings) -> AsyncIOScheduler | None:
+def create_scheduler(settings: Settings) -> AsyncIOScheduler | None:
     """Build the daemon scheduler without starting it."""
-    if not settings.enabled:
+    if not settings.scheduler.enabled:
         return None
 
-    timezone = ZoneInfo(settings.timezone)
+    timezone = ZoneInfo(settings.scheduler.timezone)
     trigger = CronTrigger.from_crontab(  # pyright: ignore[reportUnknownMemberType]
-        settings.cron,
+        settings.scheduler.cron,
         timezone=timezone,
     )
     scheduler = AsyncIOScheduler(timezone=timezone)
     _ = scheduler.add_job(  # pyright: ignore[reportUnknownMemberType]
-        scheduled_maintenance,
+        enrich_stored_sessions,
         trigger,
-        id="scheduled-maintenance",
+        args=(settings,),
+        id="enrich-sessions",
         replace_existing=True,
         coalesce=True,
         max_instances=1,

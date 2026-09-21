@@ -41,6 +41,7 @@ class CreateMessage(OmitExtra):
             timestamp=self.timestamp,
             kind=self.kind,
             role=self.role,
+            semantic_outcome=None,
             content=self.content,
         )
 

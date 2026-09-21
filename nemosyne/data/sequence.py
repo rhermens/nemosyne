@@ -2,9 +2,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import Literal
+from typing import ClassVar, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class FailureReason(StrEnum):
@@ -71,6 +71,7 @@ class Message:
     timestamp: datetime
     kind: Literal["message"]
     role: Literal["user", "assistant"]
+    semantic_outcome: SemanticOutcome | None
     content: str
 
 
@@ -85,8 +86,9 @@ class SkillUsage:
 SequenceEvent = Event | Message | SkillUsage
 
 
-@dataclass(frozen=True, slots=True)
 class Session(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
     id: str
     model: str
     working_directory: Path

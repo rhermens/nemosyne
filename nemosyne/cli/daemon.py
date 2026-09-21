@@ -6,7 +6,7 @@ import uvicorn
 from fastapi import Depends, FastAPI
 
 from nemosyne.api.session import CreateSession, StoreSessionResult, save_session
-from nemosyne.config.settings import SchedulerSettings, Settings, get_settings
+from nemosyne.config.settings import Settings, get_settings
 from nemosyne.schedule.scheduler import create_scheduler
 
 
@@ -18,7 +18,7 @@ class RunningScheduler(Protocol):
         """Stop scheduled job processing."""
 
 
-SchedulerFactory = Callable[[SchedulerSettings], RunningScheduler | None]
+SchedulerFactory = Callable[[Settings], RunningScheduler | None]
 SettingsLoader = Callable[[], Settings]
 
 
@@ -28,7 +28,7 @@ def create_app(
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
-        scheduler = scheduler_factory(settings_loader().scheduler)
+        scheduler = scheduler_factory(settings_loader())
         if scheduler is not None:
             scheduler.start()
         try:

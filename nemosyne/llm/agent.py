@@ -31,7 +31,12 @@ def agent_from_settings(settings: Settings) -> Agent[Session, Session]:
     model = models.infer_model(settings.model, provider_factory_with_key(api_key))
     return Agent(
         model,
-        instructions="Given an LLM Session with conversational sequence events and skill usages, you are to determine and fill the semantic_outcome and summary for events, and the trigger reason for skill usages",
+        instructions=(
+            "Return the same session with enrichment fields completed. "
+            "Set summary and semantic_outcome on each Event, semantic_outcome on each "
+            "Message, and trigger_reason on each SkillUsage. Preserve every raw field, "
+            "the sequence order, and the session metadata."
+        ),
         deps_type=Session,
         output_type=Session,
     )

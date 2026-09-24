@@ -43,7 +43,7 @@ def test_scheduler_is_disabled_by_default(tmp_path: Path) -> None:
     assert create_scheduler(make_settings(tmp_path)) is None
 
 
-def test_scheduler_registers_session_enrichment_cron_job(tmp_path: Path) -> None:
+def test_scheduler_registers_session_annotation_cron_job(tmp_path: Path) -> None:
     settings = make_settings(
         tmp_path,
         enabled=True,
@@ -55,10 +55,10 @@ def test_scheduler_registers_session_enrichment_cron_job(tmp_path: Path) -> None
     assert isinstance(scheduler, AsyncIOScheduler)
     job = cast(
         ConfiguredJob | None,
-        scheduler.get_job("enrich-sessions"),  # pyright: ignore[reportUnknownMemberType]
+        scheduler.get_job("annotate-sessions"),  # pyright: ignore[reportUnknownMemberType]
     )
     assert job is not None
-    assert job.id == "enrich-sessions"
+    assert job.id == "annotate-sessions"
     assert job.args == (settings,)
     assert str(job.trigger) == "cron[month='*', day='*', day_of_week='*', hour='3', minute='15']"
     assert str(scheduler.timezone) == "Europe/Amsterdam"

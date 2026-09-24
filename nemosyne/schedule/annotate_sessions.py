@@ -7,70 +7,74 @@ from tempfile import NamedTemporaryFile
 from pydantic import ValidationError
 
 from nemosyne.config.settings import Settings
+from nemosyne.data.annotation import (
+    EventAnnotation,
+    MessageAnnotation,
+    SequenceAnnotation,
+    SessionAnnotation,
+    SkillUsageAnnotation,
+)
 from nemosyne.data.sequence import Event, Message, Session, SkillUsage
 from nemosyne.llm.agent import agent_from_settings
 
 logger = logging.getLogger(__name__)
-SessionEnricher = Callable[[Session], Awaitable[Session]]
+SessionAnnotator = Callable[[Session], Awaitable[SessionAnnotation]]
 
 
 @dataclass(frozen=True, slots=True)
-class EnrichmentReport:
+class AnnotationReport:
     processed: int = 0
     skipped: int = 0
     failed: int = 0
 
 
-def session_needs_enrichment(session: Session) -> bool:
+def session_needs_annotation(session: Session) -> bool:
     return any(
-        (isinstance(item, Event) and (item.summary is None or item.semantic_outcome is None))
+        (isinstance(item, Event) and item.semantic_outcome is None)
         or (isinstance(item, Message) and item.semantic_outcome is None)
         or (isinstance(item, SkillUsage) and item.trigger_reason is None)
         for item in session.sequence
     )
 
 
-async def enrich_stored_sessions(
+async def annotate_stored_sessions(
     settings: Settings,
     *,
-    enrich: SessionEnricher | None = None,
-) -> EnrichmentReport:
+    annotator: SessionAnnotator | None = None,
+) -> AnnotationReport:
     settings.ensure_directories()
     paths = sorted(settings.sessions_path.glob("*.json"))
-    enricher = enrich
-    report = EnrichmentReport()
+    report = AnnotationReport()
 
     for path in paths:
         try:
             original = _load_session(path)
         except (OSError, ValidationError):
-            logger.exception("Could not load session for enrichment: %s", path)
+            logger.exception("Could not load session for annotation: %s", path)
             report = replace(report, failed=report.failed + 1)
             continue
 
-        if not session_needs_enrichment(original):
+        if not session_needs_annotation(original):
             report = replace(report, skipped=report.skipped + 1)
             continue
 
-        if enricher is None:
-            enricher = _configured_enricher(settings)
+        if annotator is None:
+            annotator = _configured_annotator(settings)
 
         try:
-            enriched = await enricher(original)
-            if enriched.id != original.id:
-                raise ValueError("enriched session ID does not match source session")
+            annotation = await annotator(original)
             latest = _load_session(path)
-            merged = merge_enrichment(latest, original, enriched)
+            merged = merge_annotation(latest, original, annotation)
             _write_session(path, merged)
         except Exception:
-            logger.exception("Could not enrich session: %s", path)
+            logger.exception("Could not annotate session: %s", path)
             report = replace(report, failed=report.failed + 1)
             continue
 
         report = replace(report, processed=report.processed + 1)
 
     logger.info(
-        "Session enrichment completed: processed=%d skipped=%d failed=%d",
+        "Session annotation completed: processed=%d skipped=%d failed=%d",
         report.processed,
         report.skipped,
         report.failed,
@@ -78,32 +82,35 @@ async def enrich_stored_sessions(
     return report
 
 
-def merge_enrichment(latest: Session, original: Session, enriched: Session) -> Session:
+def merge_annotation(
+    latest: Session,
+    original: Session,
+    annotation: SessionAnnotation,
+) -> Session:
+    annotations = {item.index: item for item in annotation.sequence}
     merged_sequence = [
-        _merge_item(latest_item, original.sequence[index], enriched.sequence[index])
-        if index < len(original.sequence) and index < len(enriched.sequence)
+        _merge_item(latest_item, original.sequence[index], annotations.get(index))
+        if index < len(original.sequence)
         else latest_item
         for index, latest_item in enumerate(latest.sequence)
     ]
     return latest.model_copy(update={"sequence": merged_sequence})
 
 
-def _merge_item(latest: object, original: object, enriched: object) -> object:
-    if type(latest) is not type(original) or type(original) is not type(enriched):
-        return latest
+def _merge_item(
+    latest: object,
+    original: object,
+    annotation: SequenceAnnotation | None,
+) -> object:
     if not _same_raw_item(latest, original):
         return latest
 
-    if isinstance(latest, Event) and isinstance(enriched, Event):
-        return replace(
-            latest,
-            semantic_outcome=enriched.semantic_outcome,
-            summary=enriched.summary,
-        )
-    if isinstance(latest, Message) and isinstance(enriched, Message):
-        return replace(latest, semantic_outcome=enriched.semantic_outcome)
-    if isinstance(latest, SkillUsage) and isinstance(enriched, SkillUsage):
-        return replace(latest, trigger_reason=enriched.trigger_reason)
+    if isinstance(latest, Event) and isinstance(annotation, EventAnnotation):
+        return replace(latest, semantic_outcome=annotation.semantic_outcome)
+    if isinstance(latest, Message) and isinstance(annotation, MessageAnnotation):
+        return replace(latest, semantic_outcome=annotation.semantic_outcome)
+    if isinstance(latest, SkillUsage) and isinstance(annotation, SkillUsageAnnotation):
+        return replace(latest, trigger_reason=annotation.trigger_reason)
     return latest
 
 
@@ -145,17 +152,18 @@ def _same_raw_item(latest: object, original: object) -> bool:
     return False
 
 
-def _configured_enricher(settings: Settings) -> SessionEnricher:
+def _configured_annotator(settings: Settings) -> SessionAnnotator:
     agent = agent_from_settings(settings)
 
-    async def enrich(session: Session) -> Session:
-        result = await agent.run(
-            "Add summaries and semantic outcomes to this session without changing raw events.",
-            deps=session,
+    async def annotate(session: Session) -> SessionAnnotation:
+        prompt = (
+            "Return only annotation fields for each indexed session item."
+            f"\n\nSession:\n{session.model_dump_json()}"
         )
+        result = await agent.run(prompt)
         return result.output
 
-    return enrich
+    return annotate
 
 
 def _load_session(path: Path) -> Session:

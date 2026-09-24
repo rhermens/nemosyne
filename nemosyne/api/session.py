@@ -26,7 +26,6 @@ class CreateEvent(OmitExtra):
             tool=self.tool,
             event_outcome=self.event_outcome,
             semantic_outcome=None,
-            summary=None,
         )
 
 

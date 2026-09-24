@@ -54,8 +54,8 @@ Nemosyne is an early prototype. It currently provides:
 - Idempotent updates of settled session snapshots.
 - Models for event outcomes, semantic outcomes, and skill usage.
 - OpenRouter-backed LLM configuration.
-- Initial support for enriching sessions with summaries and semantic outcomes.
-- An optional in-daemon cron job that enriches stored sessions with the configured LLM.
+- Initial support for annotating sessions with semantic outcomes.
+- An optional in-daemon cron job that annotates stored sessions with the configured LLM.
 
 Cross-session pattern detection and automated skill curation are not implemented yet.
 
@@ -88,9 +88,17 @@ scheduler:
 ```
 
 The cron expression uses five fields: minute, hour, day, month, and weekday.
-Each run enriches incomplete session events with summaries and semantic outcomes.
-Fully enriched sessions are skipped to avoid repeated LLM calls.
+Each run annotates incomplete session events with semantic outcomes and skill trigger reasons.
+Fully annotated sessions are skipped to avoid repeated LLM calls.
 When enabled, stored session content is sent to the configured LLM provider.
+
+Run the same annotation job immediately, regardless of scheduler configuration:
+
+```bash
+uv run annotate-sessions
+```
+
+The command prints the processed, skipped, and failed session counts.
 
 Load the included Pi extension:
 

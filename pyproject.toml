@@ -18,6 +18,7 @@ dependencies = [
 daemon = "nemosyne.cli.daemon:main"
 auth = "nemosyne.cli.auth:main"
 debug = "nemosyne.cli.debug:main"
+annotate-sessions = "nemosyne.cli.annotate_sessions:main"
 
 [build-system]
 requires = ["hatchling"]

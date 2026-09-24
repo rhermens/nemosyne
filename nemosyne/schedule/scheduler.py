@@ -8,7 +8,7 @@ from apscheduler.triggers.cron import (  # pyright: ignore[reportMissingTypeStub
 )
 
 from nemosyne.config.settings import Settings
-from nemosyne.schedule.enrich_sessions import enrich_stored_sessions
+from nemosyne.schedule.annotate_sessions import annotate_stored_sessions
 
 
 def create_scheduler(settings: Settings) -> AsyncIOScheduler | None:
@@ -23,10 +23,10 @@ def create_scheduler(settings: Settings) -> AsyncIOScheduler | None:
     )
     scheduler = AsyncIOScheduler(timezone=timezone)
     _ = scheduler.add_job(  # pyright: ignore[reportUnknownMemberType]
-        enrich_stored_sessions,
+        annotate_stored_sessions,
         trigger,
         args=(settings,),
-        id="enrich-sessions",
+        id="annotate-sessions",
         replace_existing=True,
         coalesce=True,
         max_instances=1,

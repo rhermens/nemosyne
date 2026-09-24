@@ -6,7 +6,7 @@ from pydantic_ai.providers.openrouter import OpenRouterProvider
 from nemosyne.config.auth import ApiKey, AuthStorage
 from nemosyne.config.llm import Provider
 from nemosyne.config.settings import Settings
-from nemosyne.data.sequence import Session
+from nemosyne.data.annotation import SessionAnnotation
 
 
 class ProviderNotImplemented(BaseException):
@@ -24,21 +24,22 @@ def provider_factory_with_key(api_key: ApiKey) -> Callable[[str], providers.Prov
     return make
 
 
-def agent_from_settings(settings: Settings) -> Agent[Session, Session]:
+def agent_from_settings(settings: Settings) -> Agent[None, SessionAnnotation]:
     auth = AuthStorage.load(settings.auth_path)
     api_key = auth[settings.provider]
 
-    model = models.infer_model(settings.model, provider_factory_with_key(api_key))
+    model = models.infer_model(
+        f"{settings.provider}:{settings.model}", provider_factory_with_key(api_key)
+    )
     return Agent(
         model,
         instructions=(
-            "Return the same session with enrichment fields completed. "
-            "Set summary and semantic_outcome on each Event, semantic_outcome on each "
-            "Message, and trigger_reason on each SkillUsage. Preserve every raw field, "
-            "the sequence order, and the session metadata."
+            "Return one annotation item for every indexed session item. "
+            "For each Event, return only its index and semantic_outcome. "
+            "For each Message, return only its index and semantic_outcome. "
+            "For each SkillUsage, return only its index and trigger_reason."
         ),
-        deps_type=Session,
-        output_type=Session,
+        output_type=SessionAnnotation,
     )
 
 

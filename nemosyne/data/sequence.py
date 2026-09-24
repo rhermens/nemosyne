@@ -25,6 +25,14 @@ class SemanticFailureReason(StrEnum):
     UNSUPPORTED_TASK = "UnsupportedTask"
 
 
+class TriggerReason(StrEnum):
+    EXPLICIT_REQUEST = "ExplicitRequest"
+    TASK_MATCH = "TaskMatch"
+    PROJECT_REQUIREMENT = "ProjectRequirement"
+    AGENT_DECISION = "AgentDecision"
+    UNKNOWN = "Unknown"
+
+
 @dataclass(frozen=True, slots=True)
 class Succeeded:
     tag: Literal["Succeeded"] = "Succeeded"
@@ -62,8 +70,7 @@ class Event:
     kind: str
     tool: str
     event_outcome: EventOutcome
-    semantic_outcome: SemanticOutcome | None
-    summary: str | None
+    semantic_outcome: SemanticOutcome | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,8 +78,8 @@ class Message:
     timestamp: datetime
     kind: Literal["message"]
     role: Literal["user", "assistant"]
-    semantic_outcome: SemanticOutcome | None
     content: str
+    semantic_outcome: SemanticOutcome | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,7 +87,7 @@ class SkillUsage:
     skill: str
     path: Path
     content_hash: str
-    trigger_reason: str | None
+    trigger_reason: TriggerReason | None = None
 
 
 SequenceEvent = Event | Message | SkillUsage

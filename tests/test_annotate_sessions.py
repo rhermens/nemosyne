@@ -199,7 +199,7 @@ def test_annotation_job_loads_sessions_without_annotation_fields(tmp_path: Path)
     assert skill.trigger_reason is TriggerReason.EXPLICIT_REQUEST
 
 
-def test_annotation_job_uses_configured_llm_agent(
+def test_annotation_job_uses_configured_jev_annotator(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -208,61 +208,42 @@ def test_annotation_job_uses_configured_llm_agent(
     session = make_unannotated_session()
     session_path = settings.sessions_path.joinpath("session-1.json")
     _ = session_path.write_text(session.model_dump_json(), encoding="utf-8")
-    observed: list[str] = []
-    agent_settings: list[Settings] = []
+    observed_settings: list[Settings] = []
+    observed_sessions: list[Session] = []
 
-    class Result:
-        output: SessionAnnotation = make_annotation()
+    def make_annotator(value: Settings) -> annotation_module.SessionAnnotator:
+        observed_settings.append(value)
 
-    class Agent:
-        async def run(self, prompt: str) -> Result:
-            observed.append(prompt)
-            return Result()
+        async def annotate(candidate: Session) -> SessionAnnotation:
+            observed_sessions.append(candidate)
+            return make_annotation()
 
-    def make_agent(value: Settings) -> Agent:
-        agent_settings.append(value)
-        return Agent()
+        return annotate
 
-    monkeypatch.setattr(annotation_module, "agent_from_settings", make_agent)
+    monkeypatch.setattr(annotation_module, "annotator_from_settings", make_annotator)
 
     report = asyncio.run(annotate_stored_sessions(settings))
 
-    expected_prompt = (
-        "Return only annotation fields for each indexed session item."
-        f"\n\nSession:\n{session.model_dump_json()}"
-    )
     assert report.processed == 1
-    assert agent_settings == [settings]
-    assert observed == [expected_prompt]
+    assert observed_settings == [settings]
+    assert observed_sessions == [session]
     stored = Session.model_validate_json(session_path.read_text(encoding="utf-8"))
     stored_event = stored.sequence[0]
     assert isinstance(stored_event, Event)
     assert stored_event.semantic_outcome == Inconclusive()
 
 
-def test_annotation_job_preserves_session_metadata(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_annotation_job_preserves_session_metadata(tmp_path: Path) -> None:
     settings = make_settings(tmp_path)
     settings.ensure_directories()
     session = make_unannotated_session()
     session_path = settings.sessions_path.joinpath("session-1.json")
     _ = session_path.write_text(session.model_dump_json(), encoding="utf-8")
 
-    class Result:
-        output: SessionAnnotation = make_annotation()
+    async def annotate(_session: Session) -> SessionAnnotation:
+        return make_annotation()
 
-    class Agent:
-        async def run(self, _prompt: str) -> Result:
-            return Result()
-
-    def make_agent(_settings: Settings) -> Agent:
-        return Agent()
-
-    monkeypatch.setattr(annotation_module, "agent_from_settings", make_agent)
-
-    report = asyncio.run(annotate_stored_sessions(settings))
+    report = asyncio.run(annotate_stored_sessions(settings, annotator=annotate))
 
     assert report == annotation_module.AnnotationReport(processed=1)
     stored = Session.model_validate_json(session_path.read_text(encoding="utf-8"))

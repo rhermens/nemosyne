@@ -15,7 +15,7 @@ from nemosyne.data.annotation import (
     SkillUsageAnnotation,
 )
 from nemosyne.data.sequence import Event, Message, Session, SkillUsage
-from nemosyne.llm.agent import agent_from_settings
+from nemosyne.llm.annotation import annotator_from_settings
 
 logger = logging.getLogger(__name__)
 SessionAnnotator = Callable[[Session], Awaitable[SessionAnnotation]]
@@ -59,7 +59,7 @@ async def annotate_stored_sessions(
             continue
 
         if annotator is None:
-            annotator = _configured_annotator(settings)
+            annotator = annotator_from_settings(settings)
 
         try:
             annotation = await annotator(original)
@@ -150,20 +150,6 @@ def _same_raw_item(latest: object, original: object) -> bool:
             original.content_hash,
         )
     return False
-
-
-def _configured_annotator(settings: Settings) -> SessionAnnotator:
-    agent = agent_from_settings(settings)
-
-    async def annotate(session: Session) -> SessionAnnotation:
-        prompt = (
-            "Return only annotation fields for each indexed session item."
-            f"\n\nSession:\n{session.model_dump_json()}"
-        )
-        result = await agent.run(prompt)
-        return result.output
-
-    return annotate
 
 
 def _load_session(path: Path) -> Session:

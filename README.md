@@ -53,9 +53,9 @@ Nemosyne is an early prototype. It currently provides:
 - A `POST /sessions` endpoint for completed sessions.
 - Idempotent updates of settled session snapshots.
 - Models for event outcomes, semantic outcomes, and skill usage.
-- OpenRouter-backed LLM configuration.
-- Initial support for annotating sessions with semantic outcomes.
-- An optional in-daemon cron job that annotates stored sessions with the configured LLM.
+- OpenRouter-backed debug LLM configuration.
+- Jev-backed session annotation with typed semantic outcomes and trigger reasons.
+- An optional in-daemon cron job that annotates stored sessions with Jev.
 
 Cross-session pattern detection and automated skill curation are not implemented yet.
 
@@ -89,8 +89,14 @@ scheduler:
 
 The cron expression uses five fields: minute, hour, day, month, and weekday.
 Each run annotates incomplete session events with semantic outcomes and skill trigger reasons.
-Fully annotated sessions are skipped to avoid repeated LLM calls.
-When enabled, stored session content is sent to the configured LLM provider.
+Fully annotated sessions are skipped to avoid repeated Jev calls.
+When enabled, stored session content is sent to TypeSafe.
+
+Store the TypeSafe API key in Nemosyne's authentication storage:
+
+```bash
+uv run auth typesafe
+```
 
 Run the same annotation job immediately, regardless of scheduler configuration:
 

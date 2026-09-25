@@ -1,4 +1,5 @@
 from collections.abc import Awaitable, Callable, Mapping
+from itertools import batched
 
 from typesafe_sdk import (
     AsyncTypeSafeClient,
@@ -29,6 +30,7 @@ from nemosyne.data.sequence import (
 )
 
 SessionAnnotator = Callable[[Session], Awaitable[SessionAnnotation]]
+MAX_QUESTIONS_PER_REQUEST = 64
 
 
 def annotator_from_settings(settings: Settings) -> SessionAnnotator:
@@ -89,11 +91,16 @@ async def annotate_session(
     session: Session,
     client: AsyncTypeSafeClient,
 ) -> SessionAnnotation:
-    result = await client.system_one(  # pyright: ignore[reportUnknownMemberType]
-        state=session.model_dump(mode="json"),
-        questions=annotation_questions(session),
-    )
-    return annotation_from_choices(session, result.choices)
+    state = session.model_dump(mode="json")
+    choices: dict[str, ChoiceAnswer] = {}
+    question_items = annotation_questions(session).items()
+    for question_batch in batched(question_items, MAX_QUESTIONS_PER_REQUEST):
+        result = await client.system_one(  # pyright: ignore[reportUnknownMemberType]
+            state=state,
+            questions=dict(question_batch),
+        )
+        choices.update(result.choices)
+    return annotation_from_choices(session, choices)
 
 
 def annotation_from_choices(

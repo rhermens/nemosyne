@@ -222,6 +222,51 @@ def make_annotation_sequence() -> list[
     ]
 
 
+def test_annotate_session_batches_large_question_sets() -> None:
+    base_event = make_session().sequence[0]
+    assert isinstance(base_event, Event)
+    session = make_session().model_copy(update={"sequence": [base_event] * 65})
+    batch_sizes: list[int] = []
+
+    def handle(request: httpx2.Request) -> httpx2.Response:
+        payload = cast(dict[str, object], json.loads(request.content))
+        questions = cast(dict[str, object], payload["questions"])
+        batch_sizes.append(len(questions))
+        if len(questions) > 64:
+            return httpx2.Response(
+                400,
+                json={"detail": {"error_type": "max_tokens_exceeded"}},
+            )
+        return httpx2.Response(
+            200,
+            json={
+                "model": "jev-1.13.0",
+                "answers": {
+                    question_id: {
+                        "type": "choice",
+                        "choice": "Inconclusive",
+                        "confidence": 1.0,
+                        "probabilities": {"Inconclusive": 1.0},
+                    }
+                    for question_id in questions
+                },
+                "usage": {"input_tokens": 10, "output_tokens": len(questions)},
+            },
+        )
+
+    async def run() -> SessionAnnotation:
+        async with AsyncTypeSafeClient(
+            api_key="test-key",
+            transport=httpx2.MockTransport(handle),
+        ) as client:
+            return await jev_annotation.annotate_session(session, client)
+
+    annotation = asyncio.run(run())
+
+    assert batch_sizes == [64, 1]
+    assert len(annotation.sequence) == 65
+
+
 def test_annotation_from_jev_choices_preserves_existing_annotations() -> None:
     session = make_session()
     event = session.sequence[0]
